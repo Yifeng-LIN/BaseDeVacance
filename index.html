@@ -1432,14 +1432,24 @@ function updatePrompt() {
 
 // ---- Marche -------------------------------------------------------------------
 function updateWalk(dt) {
-  const sp = K.sprint() ? 8.5 : 4.3;
+  const sp = K.sprint() ? 10 : 5.6;
   let mx = (K.right() ? 1 : 0) - (K.left() ? 1 : 0), mz = (K.fwd() ? 1 : 0) - (K.back() ? 1 : 0);
   const l = Math.hypot(mx, mz); if (l > 0) { mx /= l; mz /= l; }
   const fx = -Math.sin(look.yaw), fz = -Math.cos(look.yaw), rx = Math.cos(look.yaw), rz = -Math.sin(look.yaw);
-  const nx = player.x + (fx * mz + rx * mx) * sp * dt, nz = player.z + (fz * mz + rz * mx) * sp * dt;
-  const gi = groundInfo(nx, nz, player.y);
-  const blocked = gi.y > player.y + 1.05 || (!gi.surf && H(nx, nz) < -0.35) || Math.abs(nx) > WORLD / 2 - 10 || Math.abs(nz) > WORLD / 2 - 10;
-  if (!blocked) { player.x = nx; player.z = nz; }
+  const dx = (fx * mz + rx * mx) * sp * dt, dz = (fz * mz + rz * mx) * sp * dt;
+  // en hauteur (plateformes, ponts, escaliers) les barrières empêchent de tomber : on ne peut pas quitter la surface vers le vide
+  const onHigh = (player.y - H(player.x, player.z)) > 1.5;
+  const canMove = (nx, nz) => {
+    const gi = groundInfo(nx, nz, player.y);
+    if (gi.y > player.y + 1.05) return false;
+    if (!gi.surf && H(nx, nz) < -0.35) return false;
+    if (Math.abs(nx) > WORLD / 2 - 10 || Math.abs(nz) > WORLD / 2 - 10) return false;
+    if (onHigh && player.y - gi.y > 1.5) return false;
+    return true;
+  };
+  if (canMove(player.x + dx, player.z + dz)) { player.x += dx; player.z += dz; }
+  else if (canMove(player.x + dx, player.z)) player.x += dx;      // on glisse le long de la barrière
+  else if (canMove(player.x, player.z + dz)) player.z += dz;
   // troncs et mâts : on ne passe pas au travers
   for (const t of trunks) {
     const dx = player.x - t.x, dz = player.z - t.z, d = Math.hypot(dx, dz);
@@ -1490,8 +1500,9 @@ function updateZip(dt, t) {
 function endZip() {
   const d = zip.def; trolley.visible = false; setMode('walk');
   const ux = (d.p1.x - d.p0.x) / d.L, uz = (d.p1.z - d.p0.z) / d.L;
-  player.x = d.p1.x - ux * 1.2 - uz * 0.5; player.z = d.p1.z - uz * 1.2 + ux * 0.5;
-  player.y = d.landing.ground ? H(player.x, player.z) : d.landing.y; player.vy = 0; player.air = false;
+  if (d.landing.ground) { player.x = d.p1.x - ux * 1.2 - uz * 0.5; player.z = d.p1.z - uz * 1.2 + ux * 0.5; player.y = H(player.x, player.z); }
+  else { player.x = d.landing.x - ux * 0.9; player.z = d.landing.z - uz * 0.9; player.y = d.landing.y; }  // au centre du pont, jamais dans le vide
+  player.vy = 0; player.air = false; player.lastTag = null;
   look.yaw = d.yaw + lookOff.yaw; look.pitch = 0;
   if (d.courseEnd) showMsg(d.courseEnd + ' terminé ! 🎉', 4);
 }
