@@ -1824,6 +1824,7 @@ init().catch((e) => { $('status').textContent = 'Erreur : ' + e.message; console
   ['pointerup','pointercancel'].forEach(function(t){ document.addEventListener(t, function(e){ if (e.pointerId === id) { id = null; last = null; } }, true); });
 })();
 TouchPad.init({
+  landscape: true,
   dpad: 'arrows', stick: 'joystick',
   buttons: [{ label:'✋', sub:'action', code:'KeyE' }, { label:'🦘', sub:'sauter', code:'Space' }],
   menu: { label:'⚙', title:'Actions', items: [
